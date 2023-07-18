@@ -115,7 +115,7 @@ FORCE_CONFIG_DRIVE=${FORCE_CONFIG_DRIVE:-"False"}
 
 # The following NOVA_FILTERS contains SameHostFilter and DifferentHostFilter with
 # the default filters.
-NOVA_FILTERS="AvailabilityZoneFilter,ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter"
+NOVA_FILTERS="ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,ServerGroupAntiAffinityFilter,ServerGroupAffinityFilter,SameHostFilter,DifferentHostFilter"
 
 QEMU_CONF=/etc/libvirt/qemu.conf
 
@@ -1035,6 +1035,10 @@ function start_nova_compute {
     # nova-cpu.conf has been created, configure the console settings required
     # by the compute process.
     configure_console_compute
+
+    # Set rebuild timeout longer for BFV instances because we likely have
+    # slower disk than expected. Default is 20s/GB
+    iniset $NOVA_CPU_CONF DEFAULT reimage_timeout_per_gb 60
 
     # Configure the OVSDB connection for os-vif
     if [ -n "$OVSDB_SERVER_LOCAL_HOST" ]; then

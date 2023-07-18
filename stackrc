@@ -674,7 +674,7 @@ esac
 
 #IMAGE_URLS="https://download.cirros-cloud.net/${CIRROS_VERSION}/cirros-${CIRROS_VERSION}-${CIRROS_ARCH}-disk.img" # cirros full disk image
 
-CIRROS_VERSION=${CIRROS_VERSION:-"0.6.1"}
+CIRROS_VERSION=${CIRROS_VERSION:-"0.6.2"}
 CIRROS_ARCH=${CIRROS_ARCH:-$(uname -m)}
 
 # Set default image based on ``VIRT_DRIVER`` and ``LIBVIRT_TYPE``, either of
@@ -804,7 +804,7 @@ NOVA_READY_TIMEOUT=${NOVA_READY_TIMEOUT:-$SERVICE_TIMEOUT}
 SERVICE_GRACEFUL_SHUTDOWN_TIMEOUT=${SERVICE_GRACEFUL_SHUTDOWN_TIMEOUT:-5}
 
 # Service graceful shutdown timeout
-WORKER_TIMEOUT=${WORKER_TIMEOUT:-90}
+WORKER_TIMEOUT=${WORKER_TIMEOUT:-80}
 
 # Common Configuration
 # --------------------
