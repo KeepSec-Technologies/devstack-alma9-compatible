@@ -36,6 +36,12 @@ function fixup_fedora {
     # Disable selinux to avoid configuring to allow Apache access
     # to Horizon files (LP#1175444)
     if selinuxenabled; then
+        #persit selinux config across reboots
+        cat << EOF | sudo tee /etc/selinux/config
+SELINUX=permissive
+SELINUXTYPE=targeted
+EOF
+        # then disable at runtime
         sudo setenforce 0
     fi
 
@@ -87,6 +93,11 @@ function fixup_fedora {
     # https://bugzilla.redhat.com/show_bug.cgi?id=2037807
     if [[ $os_VENDOR == "CentOSStream" && $os_RELEASE -eq 8 ]]; then
         sudo sysctl -w net.ipv4.ping_group_range='0 2147483647'
+    fi
+    # TODO(ykarel): Workaround for systemd issue, remove once fix is
+    # included in systemd rpm https://bugs.launchpad.net/devstack/+bug/2029335
+    if [[ $os_VENDOR == "CentOSStream" && $os_RELEASE -eq 9 ]]; then
+        echo 'LIBVIRTD_ARGS=""' | sudo tee /etc/sysconfig/libvirtd
     fi
 }
 

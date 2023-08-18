@@ -412,9 +412,9 @@ function _ensure_lsb_release {
 #  - os_VENDOR
 #  - os_PACKAGE
 function GetOSVersion {
-    # CentOS Stream 9 does not provide lsb_release
+    # CentOS Stream 9 and RHEL 9 do not provide lsb_release
     source /etc/os-release
-    if [[ "${ID}${VERSION}" == "centos9" ]]; then
+    if [[ "${ID}${VERSION}" == "centos9" ]] || [[ "${ID}${VERSION}" =~ "rhel9" ]]; then
         os_RELEASE=${VERSION_ID}
         os_CODENAME="n/a"
         os_VENDOR=$(echo $NAME | tr -d '[:space:]')
@@ -523,6 +523,7 @@ function is_fedora {
         [ "$os_VENDOR" = "openEuler" ] || \
         [ "$os_VENDOR" = "RedHatEnterpriseServer" ] || \
         [ "$os_VENDOR" = "RedHatEnterprise" ] || \
+        [ "$os_VENDOR" = "RedHatEnterpriseLinux" ] || \
         [ "$os_VENDOR" = "Rocky" ] || \
         [ "$os_VENDOR" = "CentOS" ] || [ "$os_VENDOR" = "CentOSStream" ] || \
         [ "$os_VENDOR" = "AlmaLinux" ] || \
@@ -612,9 +613,10 @@ function git_clone {
                 echo "the project to the \$PROJECTS variable in the job definition."
                 die $LINENO "ERROR_ON_CLONE is set to True so cloning not allowed in this configuration"
             fi
-            git_timed clone $git_clone_flags $git_remote $git_dest
+            git_timed clone --no-checkout $git_clone_flags $git_remote $git_dest
             cd $git_dest
-            git checkout $git_ref
+            git_timed fetch $git_clone_flags origin $git_ref
+            git_timed checkout FETCH_HEAD
         elif [[ "$RECLONE" = "True" ]]; then
             # if it does exist then simulate what clone does if asked to RECLONE
             cd $git_dest
@@ -1523,6 +1525,7 @@ function write_user_unit_file {
     mkdir -p $SYSTEMD_DIR
 
     iniset -sudo $unitfile "Unit" "Description" "Devstack $service"
+    iniset -sudo $unitfile "Service" "Environment" "\"PATH=$PATH\""
     iniset -sudo $unitfile "Service" "User" "$user"
     iniset -sudo $unitfile "Service" "ExecStart" "$command"
     iniset -sudo $unitfile "Service" "KillMode" "process"
@@ -1550,6 +1553,7 @@ function write_uwsgi_user_unit_file {
     mkdir -p $SYSTEMD_DIR
 
     iniset -sudo $unitfile "Unit" "Description" "Devstack $service"
+    iniset -sudo $unitfile "Service" "Environment" "\"PATH=$PATH\""
     iniset -sudo $unitfile "Service" "SyslogIdentifier" "$service"
     iniset -sudo $unitfile "Service" "User" "$user"
     iniset -sudo $unitfile "Service" "ExecStart" "$command"
@@ -1615,6 +1619,9 @@ function _run_under_systemd {
     fi
     local env_vars="$5"
     if [[ "$command" =~ "uwsgi" ]] ; then
+        if [[ "$GLOBAL_VENV" == "True" ]] ; then
+            cmd="$cmd --venv $DEVSTACK_VENV"
+        fi
         write_uwsgi_user_unit_file $systemd_service "$cmd" "$group" "$user" "$env_vars"
     else
         write_user_unit_file $systemd_service "$cmd" "$group" "$user" "$env_vars"

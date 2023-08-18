@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+
 # ``stack.sh`` is an opinionated OpenStack developer installation.  It
 # installs and configures various combinations of **Cinder**, **Glance**,
 # **Horizon**, **Keystone**, **Nova**, **Neutron**, and **Swift**
@@ -12,7 +13,7 @@
 # a multi-node developer install.
 
 # To keep this script simple we assume you are running on a recent **Ubuntu**
-# (Bionic or newer), **Fedora** (F36 or newer), or **CentOS/RHEL**
+# (Bionic or newer) or **CentOS/RHEL/RockyLinux**
 # (7 or newer) machine. (It may work on other platforms but support for those
 # platforms is left to those who added them to DevStack.) It should work in
 # a VM or physical server. Additionally, we maintain a list of ``deb`` and
@@ -229,7 +230,7 @@ write_devstack_version
 
 # Warn users who aren't on an explicitly supported distro, but allow them to
 # override check and attempt installation with ``FORCE=yes ./stack``
-SUPPORTED_DISTROS="bullseye|focal|jammy|f36|rhel8|rhel9|openEuler-22.03"
+SUPPORTED_DISTROS="bookworm|bullseye|focal|jammy|rhel8|rhel9|openEuler-22.03"
 
 if [[ ! ${DISTRO} =~ $SUPPORTED_DISTROS ]]; then
     echo "WARNING: this script has not been tested on $DISTRO"
@@ -406,7 +407,10 @@ if [[ $DISTRO == "rhel8" ]]; then
     # Patch: https://github.com/rpm-software-management/dnf/pull/1448
     echo "[]" | sudo tee /var/cache/dnf/expired_repos.json
 elif [[ $DISTRO == "rhel9" ]]; then
+    # for CentOS Stream 9 repository
     sudo dnf config-manager --set-enabled crb
+    # for RHEL 9 repository
+    sudo dnf config-manager --set-enabled codeready-builder-for-rhel-9-x86_64-rpms
     # rabbitmq and other packages are provided by RDO repositories.
     _install_rdo
 
@@ -820,6 +824,19 @@ fi
 # Do the ugly hacks for broken packages and distros
 source $TOP_DIR/tools/fixup_stuff.sh
 fixup_all
+
+if [[ "$GLOBAL_VENV" == "True" ]] ; then
+    # TODO(frickler): find a better solution for this
+    sudo ln -sf /opt/stack/data/venv/bin/cinder-rtstool /usr/local/bin
+    sudo ln -sf /opt/stack/data/venv/bin/glance /usr/local/bin
+    sudo ln -sf /opt/stack/data/venv/bin/nova-manage /usr/local/bin
+    sudo ln -sf /opt/stack/data/venv/bin/openstack /usr/local/bin
+    sudo ln -sf /opt/stack/data/venv/bin/privsep-helper /usr/local/bin
+    sudo ln -sf /opt/stack/data/venv/bin/rally /usr/local/bin
+    sudo ln -sf /opt/stack/data/venv/bin/tox /usr/local/bin
+
+    setup_devstack_virtualenv
+fi
 
 # Install subunit for the subunit output stream
 pip_install -U os-testr
