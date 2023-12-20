@@ -230,7 +230,7 @@ write_devstack_version
 
 # Warn users who aren't on an explicitly supported distro, but allow them to
 # override check and attempt installation with ``FORCE=yes ./stack``
-SUPPORTED_DISTROS="bookworm|bullseye|focal|jammy|rhel8|rhel9|openEuler-22.03"
+SUPPORTED_DISTROS="bookworm|bullseye|jammy|rhel8|rhel9|openEuler-22.03"
 
 if [[ ! ${DISTRO} =~ $SUPPORTED_DISTROS ]]; then
     echo "WARNING: this script has not been tested on $DISTRO"
@@ -312,22 +312,14 @@ function _install_rdo {
             sudo dnf -y install https://rdoproject.org/repos/openstack-${rdo_release}/rdo-release-${rdo_release}.el8.rpm
         fi
     elif [[ $DISTRO == "rhel9" ]]; then
-        install_package wget
-        # We need to download rdo-release package using wget as installing with dnf from repo.fedoraproject.org fails in
-        # FIPS enabled systems after https://bugzilla.redhat.com/show_bug.cgi?id=2157951
-        # Until we can pull rdo-release from a server which supports EMS, this workaround is doing wget, which does
-        # not relies on openssl but on gnutls, and then install it locally using rpm
-        TEMPRDODIR=$(mktemp -d)
         if [[ "$TARGET_BRANCH" == "master" ]]; then
             # rdo-release.el9.rpm points to latest RDO release, use that for master
-            wget -P $TEMPRDODIR  https://rdoproject.org/repos/rdo-release.el9.rpm
+            sudo dnf -y install https://rdoproject.org/repos/rdo-release.el9.rpm
         else
             # For stable branches use corresponding release rpm
             rdo_release=$(echo $TARGET_BRANCH | sed "s|stable/||g")
-            wget -P $TEMPRDODIR https://rdoproject.org/repos/openstack-${rdo_release}/rdo-release-${rdo_release}.el9.rpm
+            sudo dnf -y install https://rdoproject.org/repos/openstack-${rdo_release}/rdo-release-${rdo_release}.el9.rpm
         fi
-        sudo rpm -ivh $TEMPRDODIR/rdo-release*rpm
-        rm -rf $TEMPRDODIR
     fi
     sudo dnf -y update
 }
@@ -350,7 +342,9 @@ fi
 
 # Destination path for devstack logs
 if [[ -n ${LOGDIR:-} ]]; then
-    mkdir -p $LOGDIR
+    sudo mkdir -p $LOGDIR
+    safe_chown -R $STACK_USER $LOGDIR
+    safe_chmod 0755 $LOGDIR
 fi
 
 # Destination path for service data
@@ -427,8 +421,12 @@ elif [[ $DISTRO == "openEuler-22.03" ]]; then
     # 1. the hostname package is not installed by default
     # 2. Some necessary packages are in openstack repo, for example liberasurecode-devel
     # 3. python3-pip can be uninstalled by `get_pip.py` automaticly.
-    install_package hostname openstack-release-wallaby
+    # 4. Ensure wget installation before use
+    install_package hostname openstack-release-wallaby wget
     uninstall_package python3-pip
+
+    # Add yum repository for libvirt7.X
+    sudo wget https://eur.openeuler.openatom.cn/coprs/g/sig-openstack/Libvirt-7.X/repo/openeuler-22.03_LTS/group_sig-openstack-Libvirt-7.X-openeuler-22.03_LTS.repo -O /etc/yum.repos.d/libvirt7.2.0.repo
 fi
 
 # Ensure python is installed

@@ -188,8 +188,17 @@ ENFORCE_SCOPE=$(trueorfalse False ENFORCE_SCOPE)
 # Note that the DATA_DIR is selected because grenade testing uses a shared
 # DATA_DIR but different DEST dirs and we don't want two sets of venvs,
 # instead we want one global set.
-GLOBAL_VENV=$(trueorfalse True GLOBAL_VENV)
 DEVSTACK_VENV=${DEVSTACK_VENV:-$DATA_DIR/venv}
+
+# NOTE(kopecmartin): remove this once this is fixed
+# https://bugs.launchpad.net/devstack/+bug/2031639
+# This couldn't go to fixup_stuff as that's called after projects
+# (e.g. certain paths) are set taking GLOBAL_VENV into account
+if [[ "$os_VENDOR" =~ (CentOSStream|Rocky) ]]; then
+    GLOBAL_VENV=$(trueorfalse False GLOBAL_VENV)
+else
+    GLOBAL_VENV=$(trueorfalse True GLOBAL_VENV)
+fi
 
 # Enable use of Python virtual environments.  Individual project use of
 # venvs are controlled by the PROJECT_VENV array; every project with
@@ -256,7 +265,7 @@ REQUIREMENTS_DIR=${REQUIREMENTS_DIR:-$DEST/requirements}
 # Setting the variable to 'ALL' will activate the download for all
 # libraries.
 
-DEVSTACK_SERIES="2023.2"
+DEVSTACK_SERIES="2024.1"
 
 ##############
 #
@@ -728,11 +737,11 @@ fi
 EXTRA_CACHE_URLS=""
 
 # etcd3 defaults
-ETCD_VERSION=${ETCD_VERSION:-v3.3.12}
-ETCD_SHA256_AMD64=${ETCD_SHA256_AMD64:-"dc5d82df095dae0a2970e4d870b6929590689dd707ae3d33e7b86da0f7f211b6"}
-ETCD_SHA256_ARM64=${ETCD_SHA256_ARM64:-"170b848ac1a071fe7d495d404a868a2c0090750b2944f8a260ef1c6125b2b4f4"}
-ETCD_SHA256_PPC64=${ETCD_SHA256_PPC64:-"77f807b1b51abbf51e020bb05bdb8ce088cb58260fcd22749ea32eee710463d3"}
-# etcd v3.2.x doesn't have anything for s390x
+ETCD_VERSION=${ETCD_VERSION:-v3.4.27}
+ETCD_SHA256_AMD64=${ETCD_SHA256_AMD64:-"a32d21e006252dbc3405b0645ba8468021ed41376974b573285927bf39b39eb9"}
+ETCD_SHA256_ARM64=${ETCD_SHA256_ARM64:-"ed7e257c225b9b9545fac22246b97f4074a4b5109676e92dbaebfb9315b69cc0"}
+ETCD_SHA256_PPC64=${ETCD_SHA256_PPC64:-"eb8825e0bc2cbaf9e55947f5ee373ebc9ca43b6a2ea5ced3b992c81855fff37e"}
+# etcd v3.2.x and later doesn't have anything for s390x
 ETCD_SHA256_S390X=${ETCD_SHA256_S390X:-""}
 # Make sure etcd3 downloads the correct architecture
 if is_arch "x86_64"; then

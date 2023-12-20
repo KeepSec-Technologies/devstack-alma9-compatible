@@ -430,6 +430,7 @@
         /var/log/mysql: logs
         /var/log/libvirt: logs
         /etc/libvirt: logs
+        /etc/lvm: logs
         /etc/sudoers: logs
         /etc/sudoers.d: logs
         '{{ stage_dir }}/iptables.txt': logs
@@ -708,9 +709,6 @@
     nodeset: devstack-single-node-centos-9-stream
     timeout: 9000
     voting: false
-    vars:
-      devstack_localrc:
-        GLOBAL_VENV: false
 
 - job:
     name: devstack-platform-debian-bookworm
@@ -718,12 +716,8 @@
     description: Debian Bookworm platform test
     nodeset: devstack-single-node-debian-bookworm
     timeout: 9000
-    voting: false
     vars:
       configure_swap_size: 4096
-      devstack_localrc:
-        # TODO(frickler): drop this once wheel build is fixed
-        MYSQL_GATHER_PERFORMANCE: false
 
 - job:
     name: devstack-platform-debian-bullseye
@@ -733,9 +727,6 @@
     timeout: 9000
     vars:
       configure_swap_size: 4096
-      devstack_localrc:
-        # TODO(frickler): drop this once wheel build is fixed
-        MYSQL_GATHER_PERFORMANCE: false
 
 - job:
     name: devstack-platform-rocky-blue-onyx
@@ -745,15 +736,6 @@
     timeout: 9000
     vars:
       configure_swap_size: 4096
-      devstack_localrc:
-        GLOBAL_VENV: false
-
-- job:
-    name: devstack-platform-ubuntu-focal
-    parent: tempest-full-py3
-    description: Ubuntu 20.04 LTS (focal) platform test
-    nodeset: openstack-single-node-focal
-    timeout: 9000
 
 - job:
     name: devstack-platform-ubuntu-jammy-ovn-source
@@ -950,7 +932,6 @@
         - devstack-platform-debian-bookworm
         - devstack-platform-debian-bullseye
         - devstack-platform-rocky-blue-onyx
-        - devstack-platform-ubuntu-focal
         - devstack-platform-ubuntu-jammy-ovn-source
         - devstack-platform-ubuntu-jammy-ovs
         - devstack-platform-openEuler-22.03-ovn-source
@@ -965,10 +946,6 @@
               - ^.*\.rst$
               - ^doc/.*$
         - neutron-ovs-grenade-multinode:
-            irrelevant-files:
-              - ^.*\.rst$
-              - ^doc/.*$
-        - neutron-linuxbridge-tempest:
             irrelevant-files:
               - ^.*\.rst$
               - ^doc/.*$
@@ -998,18 +975,14 @@
       jobs:
         - devstack
         - devstack-ipv6
+        - devstack-platform-debian-bookworm
         - devstack-platform-debian-bullseye
-        - devstack-platform-ubuntu-focal
         - devstack-platform-rocky-blue-onyx
         - devstack-enforce-scope
         - devstack-multinode
         - devstack-unit-tests
         - openstack-tox-bashate
         - neutron-ovs-grenade-multinode:
-            irrelevant-files:
-              - ^.*\.rst$
-              - ^doc/.*$
-        - neutron-linuxbridge-tempest:
             irrelevant-files:
               - ^.*\.rst$
               - ^doc/.*$
@@ -1082,5 +1055,11 @@
         - devstack-no-tls-proxy
     periodic-weekly:
       jobs:
+        - devstack-platform-centos-9-stream
+        - devstack-platform-debian-bookworm
+        - devstack-platform-debian-bullseye
+        - devstack-platform-rocky-blue-onyx
+        - devstack-platform-ubuntu-jammy-ovn-source
+        - devstack-platform-ubuntu-jammy-ovs
         - devstack-platform-openEuler-22.03-ovn-source
         - devstack-platform-openEuler-22.03-ovs
