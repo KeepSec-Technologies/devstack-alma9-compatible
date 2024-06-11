@@ -28,8 +28,6 @@ openstack/aodh                           `https://opendev.org/openstack/aodh <ht
 openstack/barbican                       `https://opendev.org/openstack/barbican <https://opendev.org/openstack/barbican>`__
 openstack/blazar                         `https://opendev.org/openstack/blazar <https://opendev.org/openstack/blazar>`__
 openstack/ceilometer                     `https://opendev.org/openstack/ceilometer <https://opendev.org/openstack/ceilometer>`__
-openstack/ceilometer-powervm             `https://opendev.org/openstack/ceilometer-powervm <https://opendev.org/openstack/ceilometer-powervm>`__
-openstack/cinderlib                      `https://opendev.org/openstack/cinderlib <https://opendev.org/openstack/cinderlib>`__
 openstack/cloudkitty                     `https://opendev.org/openstack/cloudkitty <https://opendev.org/openstack/cloudkitty>`__
 openstack/cyborg                         `https://opendev.org/openstack/cyborg <https://opendev.org/openstack/cyborg>`__
 openstack/designate                      `https://opendev.org/openstack/designate <https://opendev.org/openstack/designate>`__
@@ -39,7 +37,6 @@ openstack/devstack-plugin-container      `https://opendev.org/openstack/devstack
 openstack/devstack-plugin-kafka          `https://opendev.org/openstack/devstack-plugin-kafka <https://opendev.org/openstack/devstack-plugin-kafka>`__
 openstack/devstack-plugin-nfs            `https://opendev.org/openstack/devstack-plugin-nfs <https://opendev.org/openstack/devstack-plugin-nfs>`__
 openstack/devstack-plugin-open-cas       `https://opendev.org/openstack/devstack-plugin-open-cas <https://opendev.org/openstack/devstack-plugin-open-cas>`__
-openstack/ec2-api                        `https://opendev.org/openstack/ec2-api <https://opendev.org/openstack/ec2-api>`__
 openstack/freezer                        `https://opendev.org/openstack/freezer <https://opendev.org/openstack/freezer>`__
 openstack/freezer-api                    `https://opendev.org/openstack/freezer-api <https://opendev.org/openstack/freezer-api>`__
 openstack/freezer-tempest-plugin         `https://opendev.org/openstack/freezer-tempest-plugin <https://opendev.org/openstack/freezer-tempest-plugin>`__
@@ -64,12 +61,10 @@ openstack/mistral                        `https://opendev.org/openstack/mistral 
 openstack/monasca-api                    `https://opendev.org/openstack/monasca-api <https://opendev.org/openstack/monasca-api>`__
 openstack/monasca-events-api             `https://opendev.org/openstack/monasca-events-api <https://opendev.org/openstack/monasca-events-api>`__
 openstack/monasca-tempest-plugin         `https://opendev.org/openstack/monasca-tempest-plugin <https://opendev.org/openstack/monasca-tempest-plugin>`__
-openstack/murano                         `https://opendev.org/openstack/murano <https://opendev.org/openstack/murano>`__
 openstack/networking-bagpipe             `https://opendev.org/openstack/networking-bagpipe <https://opendev.org/openstack/networking-bagpipe>`__
 openstack/networking-baremetal           `https://opendev.org/openstack/networking-baremetal <https://opendev.org/openstack/networking-baremetal>`__
 openstack/networking-bgpvpn              `https://opendev.org/openstack/networking-bgpvpn <https://opendev.org/openstack/networking-bgpvpn>`__
 openstack/networking-generic-switch      `https://opendev.org/openstack/networking-generic-switch <https://opendev.org/openstack/networking-generic-switch>`__
-openstack/networking-powervm             `https://opendev.org/openstack/networking-powervm <https://opendev.org/openstack/networking-powervm>`__
 openstack/networking-sfc                 `https://opendev.org/openstack/networking-sfc <https://opendev.org/openstack/networking-sfc>`__
 openstack/neutron                        `https://opendev.org/openstack/neutron <https://opendev.org/openstack/neutron>`__
 openstack/neutron-dynamic-routing        `https://opendev.org/openstack/neutron-dynamic-routing <https://opendev.org/openstack/neutron-dynamic-routing>`__
@@ -79,7 +74,6 @@ openstack/neutron-tempest-plugin         `https://opendev.org/openstack/neutron-
 openstack/neutron-vpnaas                 `https://opendev.org/openstack/neutron-vpnaas <https://opendev.org/openstack/neutron-vpnaas>`__
 openstack/neutron-vpnaas-dashboard       `https://opendev.org/openstack/neutron-vpnaas-dashboard <https://opendev.org/openstack/neutron-vpnaas-dashboard>`__
 openstack/nova                           `https://opendev.org/openstack/nova <https://opendev.org/openstack/nova>`__
-openstack/nova-powervm                   `https://opendev.org/openstack/nova-powervm <https://opendev.org/openstack/nova-powervm>`__
 openstack/octavia                        `https://opendev.org/openstack/octavia <https://opendev.org/openstack/octavia>`__
 openstack/octavia-dashboard              `https://opendev.org/openstack/octavia-dashboard <https://opendev.org/openstack/octavia-dashboard>`__
 openstack/octavia-tempest-plugin         `https://opendev.org/openstack/octavia-tempest-plugin <https://opendev.org/openstack/octavia-tempest-plugin>`__
@@ -88,12 +82,8 @@ openstack/osprofiler                     `https://opendev.org/openstack/osprofil
 openstack/ovn-bgp-agent                  `https://opendev.org/openstack/ovn-bgp-agent <https://opendev.org/openstack/ovn-bgp-agent>`__
 openstack/ovn-octavia-provider           `https://opendev.org/openstack/ovn-octavia-provider <https://opendev.org/openstack/ovn-octavia-provider>`__
 openstack/rally-openstack                `https://opendev.org/openstack/rally-openstack <https://opendev.org/openstack/rally-openstack>`__
-openstack/sahara                         `https://opendev.org/openstack/sahara <https://opendev.org/openstack/sahara>`__
-openstack/sahara-dashboard               `https://opendev.org/openstack/sahara-dashboard <https://opendev.org/openstack/sahara-dashboard>`__
-openstack/senlin                         `https://opendev.org/openstack/senlin <https://opendev.org/openstack/senlin>`__
 openstack/shade                          `https://opendev.org/openstack/shade <https://opendev.org/openstack/shade>`__
 openstack/skyline-apiserver              `https://opendev.org/openstack/skyline-apiserver <https://opendev.org/openstack/skyline-apiserver>`__
-openstack/solum                          `https://opendev.org/openstack/solum <https://opendev.org/openstack/solum>`__
 openstack/storlets                       `https://opendev.org/openstack/storlets <https://opendev.org/openstack/storlets>`__
 openstack/tacker                         `https://opendev.org/openstack/tacker <https://opendev.org/openstack/tacker>`__
 openstack/tap-as-a-service               `https://opendev.org/openstack/tap-as-a-service <https://opendev.org/openstack/tap-as-a-service>`__

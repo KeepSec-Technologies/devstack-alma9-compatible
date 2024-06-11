@@ -1,14 +1,4 @@
 - nodeset:
-    name: openstack-single-node
-    nodes:
-      - name: controller
-        label: ubuntu-xenial
-    groups:
-      - name: tempest
-        nodes:
-          - controller
-
-- nodeset:
     name: openstack-single-node-jammy
     nodes:
       - name: controller
@@ -33,26 +23,6 @@
     nodes:
       - name: controller
         label: ubuntu-bionic
-    groups:
-      - name: tempest
-        nodes:
-          - controller
-
-- nodeset:
-    name: openstack-single-node-xenial
-    nodes:
-      - name: controller
-        label: ubuntu-xenial
-    groups:
-      - name: tempest
-        nodes:
-          - controller
-
-- nodeset:
-    name: devstack-single-node-centos-7
-    nodes:
-      - name: controller
-        label: centos-7
     groups:
       - name: tempest
         nodes:
@@ -117,36 +87,6 @@
       - name: tempest
         nodes:
           - controller
-
-- nodeset:
-    name: openstack-two-node
-    nodes:
-      - name: controller
-        label: ubuntu-xenial
-      - name: compute1
-        label: ubuntu-xenial
-    groups:
-      # Node where tests are executed and test results collected
-      - name: tempest
-        nodes:
-          - controller
-      # Nodes running the compute service
-      - name: compute
-        nodes:
-          - controller
-          - compute1
-      # Nodes that are not the controller
-      - name: subnode
-        nodes:
-          - compute1
-      # Switch node for multinode networking setup
-      - name: switch
-        nodes:
-          - controller
-      # Peer nodes for multinode networking setup
-      - name: peers
-        nodes:
-          - compute1
 
 - nodeset:
     name: openstack-two-node-centos-9-stream
@@ -245,36 +185,6 @@
         label: ubuntu-bionic
       - name: compute1
         label: ubuntu-bionic
-    groups:
-      # Node where tests are executed and test results collected
-      - name: tempest
-        nodes:
-          - controller
-      # Nodes running the compute service
-      - name: compute
-        nodes:
-          - controller
-          - compute1
-      # Nodes that are not the controller
-      - name: subnode
-        nodes:
-          - compute1
-      # Switch node for multinode networking setup
-      - name: switch
-        nodes:
-          - controller
-      # Peer nodes for multinode networking setup
-      - name: peers
-        nodes:
-          - compute1
-
-- nodeset:
-    name: openstack-two-node-xenial
-    nodes:
-      - name: controller
-        label: ubuntu-xenial
-      - name: compute1
-        label: ubuntu-xenial
     groups:
       # Node where tests are executed and test results collected
       - name: tempest
@@ -734,6 +644,11 @@
     description: Rocky Linux 9 Blue Onyx platform test
     nodeset: devstack-single-node-rockylinux-9
     timeout: 9000
+    # NOTE(danms): This has been failing lately with some repository metadata
+    # errors. We're marking this as non-voting until it appears to have
+    # stabilized:
+    # https://zuul.openstack.org/builds?job_name=devstack-platform-rocky-blue-onyx&skip=0
+    voting: false
     vars:
       configure_swap_size: 4096
 
@@ -977,7 +892,9 @@
         - devstack-ipv6
         - devstack-platform-debian-bookworm
         - devstack-platform-debian-bullseye
-        - devstack-platform-rocky-blue-onyx
+        # NOTE(danms): Disabled due to instability, see comment in the job
+        # definition above.
+        # - devstack-platform-rocky-blue-onyx
         - devstack-enforce-scope
         - devstack-multinode
         - devstack-unit-tests
