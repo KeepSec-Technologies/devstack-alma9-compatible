@@ -230,7 +230,7 @@ write_devstack_version
 
 # Warn users who aren't on an explicitly supported distro, but allow them to
 # override check and attempt installation with ``FORCE=yes ./stack``
-SUPPORTED_DISTROS="bookworm|bullseye|jammy|rhel8|rhel9|openEuler-22.03"
+SUPPORTED_DISTROS="bookworm|jammy|noble|rhel9"
 
 if [[ ! ${DISTRO} =~ $SUPPORTED_DISTROS ]]; then
     echo "WARNING: this script has not been tested on $DISTRO"
@@ -302,23 +302,17 @@ function _install_epel {
 }
 
 function _install_rdo {
-    if [[ $DISTRO == "rhel8" ]]; then
+    if [[ $DISTRO == "rhel9" ]]; then
+        rdo_release=${TARGET_BRANCH#*/}
         if [[ "$TARGET_BRANCH" == "master" ]]; then
-            # rdo-release.el8.rpm points to latest RDO release, use that for master
-            sudo dnf -y install https://rdoproject.org/repos/rdo-release.el8.rpm
+            # adding delorean-deps repo to provide current master rpms
+            sudo wget https://trunk.rdoproject.org/centos9-master/delorean-deps.repo -O /etc/yum.repos.d/delorean-deps.repo
         else
-            # For stable branches use corresponding release rpm
-            rdo_release=$(echo $TARGET_BRANCH | sed "s|stable/||g")
-            sudo dnf -y install https://rdoproject.org/repos/openstack-${rdo_release}/rdo-release-${rdo_release}.el8.rpm
-        fi
-    elif [[ $DISTRO == "rhel9" ]]; then
-        if [[ "$TARGET_BRANCH" == "master" ]]; then
-            # rdo-release.el9.rpm points to latest RDO release, use that for master
-            sudo dnf -y install https://rdoproject.org/repos/rdo-release.el9.rpm
-        else
-            # For stable branches use corresponding release rpm
-            rdo_release=$(echo $TARGET_BRANCH | sed "s|stable/||g")
-            sudo dnf -y install https://rdoproject.org/repos/openstack-${rdo_release}/rdo-release-${rdo_release}.el9.rpm
+            if sudo dnf provides centos-release-openstack-${rdo_release} >/dev/null 2>&1; then
+                sudo dnf -y install centos-release-openstack-${rdo_release}
+            else
+                sudo wget https://trunk.rdoproject.org/centos9-${rdo_release}/delorean-deps.repo -O /etc/yum.repos.d/delorean-deps.repo
+            fi
         fi
     fi
     sudo dnf -y update
@@ -647,6 +641,7 @@ source $TOP_DIR/lib/swift
 source $TOP_DIR/lib/neutron
 source $TOP_DIR/lib/ldap
 source $TOP_DIR/lib/dstat
+source $TOP_DIR/lib/atop
 source $TOP_DIR/lib/tcpdump
 source $TOP_DIR/lib/etcd3
 source $TOP_DIR/lib/os-vif
@@ -1099,6 +1094,12 @@ save_stackenv $LINENO
 # A better kind of sysstat, with the top process per time slice
 start_dstat
 
+if is_service_enabled atop; then
+    configure_atop
+    install_atop
+    start_atop
+fi
+
 # Run a background tcpdump for debugging
 # Note: must set TCPDUMP_ARGS with the enabled service
 if is_service_enabled tcpdump; then
@@ -1313,10 +1314,7 @@ if is_service_enabled ovn-controller ovn-controller-vtep; then
     start_ovn_services
 fi
 
-if is_service_enabled neutron-api; then
-    echo_summary "Starting Neutron"
-    start_neutron_api
-elif is_service_enabled q-svc; then
+if is_service_enabled q-svc neutron-api; then
     echo_summary "Starting Neutron"
     configure_neutron_after_post_config
     start_neutron_service_and_check
@@ -1333,7 +1331,7 @@ if is_service_enabled neutron; then
     start_neutron
 fi
 # Once neutron agents are started setup initial network elements
-if is_service_enabled q-svc && [[ "$NEUTRON_CREATE_INITIAL_NETWORKS" == "True" ]]; then
+if is_service_enabled q-svc neutron-api && [[ "$NEUTRON_CREATE_INITIAL_NETWORKS" == "True" ]]; then
     echo_summary "Creating initial neutron network elements"
     # Here's where plugins can wire up their own networks instead
     # of the code in lib/neutron_plugins/services/l3

@@ -62,7 +62,7 @@ CINDER_STATE_PATH=${CINDER_STATE_PATH:=$DATA_DIR/cinder}
 
 CINDER_CONF_DIR=/etc/cinder
 CINDER_CONF=$CINDER_CONF_DIR/cinder.conf
-CINDER_UWSGI=$CINDER_BIN_DIR/cinder-wsgi
+CINDER_UWSGI=cinder.wsgi.api:application
 CINDER_UWSGI_CONF=$CINDER_CONF_DIR/cinder-api-uwsgi.ini
 CINDER_API_PASTE_INI=$CINDER_CONF_DIR/api-paste.ini
 
@@ -87,6 +87,10 @@ CINDER_SERVICE_REPORT_INTERVAL=${CINDER_SERVICE_REPORT_INTERVAL:-120}
 # default, which is thick, or thin, which as the name implies utilizes lvm
 # thin provisioning.
 CINDER_LVM_TYPE=${CINDER_LVM_TYPE:-auto}
+
+# ``CINDER_USE_SERVICE_TOKEN`` is a mode where service token is passed along with
+# user token while communicating to external REST APIs like Glance.
+CINDER_USE_SERVICE_TOKEN=$(trueorfalse True CINDER_USE_SERVICE_TOKEN)
 
 # Default backends
 # The backend format is type:name where type is one of the supported backend
@@ -156,10 +160,6 @@ fi
 # Supported backup drivers are in lib/cinder_backups
 CINDER_BACKUP_DRIVER=${CINDER_BACKUP_DRIVER:-swift}
 
-# Toggle for deploying Cinder under a wsgi server. Legacy mod_wsgi
-# reference should be cleaned up to more accurately refer to uwsgi.
-CINDER_USE_MOD_WSGI=${CINDER_USE_MOD_WSGI:-True}
-
 # Source the enabled backends
 if is_service_enabled c-vol && [[ -n "$CINDER_ENABLED_BACKENDS" ]]; then
     for be in ${CINDER_ENABLED_BACKENDS//,/ }; do
@@ -183,6 +183,12 @@ fi
 # Environment variables to configure the image-volume cache
 CINDER_IMG_CACHE_ENABLED=${CINDER_IMG_CACHE_ENABLED:-True}
 
+# Environment variables to configure the optimized volume upload
+CINDER_UPLOAD_OPTIMIZED=${CINDER_UPLOAD_OPTIMIZED:-False}
+
+# Environment variables to configure the internal tenant during optimized volume upload
+CINDER_UPLOAD_INTERNAL_TENANT=${CINDER_UPLOAD_INTERNAL_TENANT:-False}
+
 # For limits, if left unset, it will use cinder defaults of 0 for unlimited
 CINDER_IMG_CACHE_SIZE_GB=${CINDER_IMG_CACHE_SIZE_GB:-}
 CINDER_IMG_CACHE_SIZE_COUNT=${CINDER_IMG_CACHE_SIZE_COUNT:-}
@@ -191,6 +197,11 @@ CINDER_IMG_CACHE_SIZE_COUNT=${CINDER_IMG_CACHE_SIZE_COUNT:-}
 # form as the CINDER_ENABLED_BACKENDS config option. By default it will
 # enable the cache for all cinder backends.
 CINDER_CACHE_ENABLED_FOR_BACKENDS=${CINDER_CACHE_ENABLED_FOR_BACKENDS:-$CINDER_ENABLED_BACKENDS}
+
+# Configure which cinder backends will have optimized volume upload, this takes the same
+# form as the CINDER_ENABLED_BACKENDS config option. By default it will
+# enable the cache for all cinder backends.
+CINDER_UPLOAD_OPTIMIZED_BACKENDS=${CINDER_UPLOAD_OPTIMIZED_BACKENDS:-$CINDER_ENABLED_BACKENDS}
 
 # Flag to set the oslo_policy.enforce_scope. This is used to switch
 # the  Volume API policies to start checking the scope of token. by default,
@@ -353,6 +364,14 @@ function configure_cinder {
             iniset $CINDER_CONF DEFAULT default_volume_type ${default_name}
         fi
         configure_cinder_image_volume_cache
+
+        # The upload optimization uses Cinder's clone volume functionality to
+        # clone the Image-Volume from source volume hence can only be
+        # performed when glance is using cinder as it's backend.
+        if [[ "$USE_CINDER_FOR_GLANCE" == "True" ]]; then
+            # Configure optimized volume upload
+            configure_cinder_volume_upload
+        fi
     fi
 
     if is_service_enabled c-bak && [[ -n "$CINDER_BACKUP_DRIVER" ]]; then
@@ -370,14 +389,8 @@ function configure_cinder {
     if is_service_enabled tls-proxy; then
         if [[ "$ENABLED_SERVICES" =~ "c-api" ]]; then
             # Set the service port for a proxy to take the original
-            if [ "$CINDER_USE_MOD_WSGI" == "True" ]; then
-                iniset $CINDER_CONF DEFAULT osapi_volume_listen_port $CINDER_SERVICE_PORT_INT
-                iniset $CINDER_CONF oslo_middleware enable_proxy_headers_parsing True
-            else
-                iniset $CINDER_CONF DEFAULT osapi_volume_listen_port $CINDER_SERVICE_PORT_INT
-                iniset $CINDER_CONF DEFAULT public_endpoint $CINDER_SERVICE_PROTOCOL://$CINDER_SERVICE_HOST:$CINDER_SERVICE_PORT
-                iniset $CINDER_CONF DEFAULT osapi_volume_base_URL $CINDER_SERVICE_PROTOCOL://$CINDER_SERVICE_HOST:$CINDER_SERVICE_PORT
-            fi
+            iniset $CINDER_CONF DEFAULT osapi_volume_listen_port $CINDER_SERVICE_PORT_INT
+            iniset $CINDER_CONF oslo_middleware enable_proxy_headers_parsing True
         fi
     fi
 
@@ -388,10 +401,10 @@ function configure_cinder {
     iniset_rpc_backend cinder $CINDER_CONF
 
     # Format logging
-    setup_logging $CINDER_CONF $CINDER_USE_MOD_WSGI
+    setup_logging $CINDER_CONF
 
     if is_service_enabled c-api; then
-        write_uwsgi_config "$CINDER_UWSGI_CONF" "$CINDER_UWSGI" "/volume"
+        write_uwsgi_config "$CINDER_UWSGI_CONF" "$CINDER_UWSGI" "/volume" "" "cinder-api"
     fi
 
     if [[ -r $CINDER_PLUGINS/$CINDER_DRIVER ]]; then
@@ -426,6 +439,10 @@ function configure_cinder {
         iniset $CINDER_CONF oslo_policy enforce_scope false
         iniset $CINDER_CONF oslo_policy enforce_new_defaults false
     fi
+
+    if [ "$CINDER_USE_SERVICE_TOKEN" == "True" ]; then
+        init_cinder_service_user_conf
+    fi
 }
 
 # create_cinder_accounts() - Set up common required cinder accounts
@@ -449,32 +466,15 @@ function create_cinder_accounts {
 
         create_service_user "cinder" $extra_role
 
+        local cinder_api_url
+        cinder_api_url="$CINDER_SERVICE_PROTOCOL://$CINDER_SERVICE_HOST/volume"
+
         # block-storage is the official service type
         get_or_create_service "cinder" "block-storage" "Cinder Volume Service"
-        if [ "$CINDER_USE_MOD_WSGI" == "False" ]; then
-            get_or_create_endpoint \
-                "block-storage" \
-                "$REGION_NAME" \
-                "$CINDER_SERVICE_PROTOCOL://$CINDER_SERVICE_HOST:$CINDER_SERVICE_PORT/v3/\$(project_id)s"
-
-            get_or_create_service "cinderv3" "volumev3" "Cinder Volume Service V3"
-            get_or_create_endpoint \
-                "volumev3" \
-                "$REGION_NAME" \
-                "$CINDER_SERVICE_PROTOCOL://$CINDER_SERVICE_HOST:$CINDER_SERVICE_PORT/v3/\$(project_id)s"
-        else
-            get_or_create_endpoint \
-                "block-storage" \
-                "$REGION_NAME" \
-                "$CINDER_SERVICE_PROTOCOL://$CINDER_SERVICE_HOST/volume/v3/\$(project_id)s"
-
-            get_or_create_service "cinderv3" "volumev3" "Cinder Volume Service V3"
-            get_or_create_endpoint \
-                "volumev3" \
-                "$REGION_NAME" \
-                "$CINDER_SERVICE_PROTOCOL://$CINDER_SERVICE_HOST/volume/v3/\$(project_id)s"
-        fi
-
+        get_or_create_endpoint \
+            "block-storage" \
+            "$REGION_NAME" \
+            "$cinder_api_url/v3"
         configure_cinder_internal_tenant
     fi
 }
@@ -595,10 +595,6 @@ function start_cinder {
     local service_port=$CINDER_SERVICE_PORT
     local service_protocol=$CINDER_SERVICE_PROTOCOL
     local cinder_url
-    if is_service_enabled tls-proxy && [ "$CINDER_USE_MOD_WSGI" == "False" ]; then
-        service_port=$CINDER_SERVICE_PORT_INT
-        service_protocol="http"
-    fi
     if [ "$CINDER_TARGET_HELPER" = "tgtadm" ]; then
         if is_service_enabled c-vol; then
             # Delete any old stack.conf
@@ -615,17 +611,8 @@ function start_cinder {
     fi
 
     if [[ "$ENABLED_SERVICES" =~ "c-api" ]]; then
-        if [ "$CINDER_USE_MOD_WSGI" == "False" ]; then
-            run_process c-api "$CINDER_BIN_DIR/cinder-api --config-file $CINDER_CONF"
-            cinder_url=$service_protocol://$SERVICE_HOST:$service_port
-            # Start proxy if tls enabled
-            if is_service_enabled tls-proxy; then
-                start_tls_proxy cinder '*' $CINDER_SERVICE_PORT $CINDER_SERVICE_HOST $CINDER_SERVICE_PORT_INT
-            fi
-        else
-            run_process "c-api" "$(which uwsgi) --procname-prefix cinder-api --ini $CINDER_UWSGI_CONF"
-            cinder_url=$service_protocol://$SERVICE_HOST/volume/v3
-        fi
+        run_process "c-api" "$(which uwsgi) --procname-prefix cinder-api --ini $CINDER_UWSGI_CONF"
+        cinder_url=$service_protocol://$SERVICE_HOST/volume/v3
     fi
 
     echo "Waiting for Cinder API to start..."
@@ -729,6 +716,24 @@ function configure_cinder_image_volume_cache {
     done
 }
 
+function configure_cinder_volume_upload {
+    # Expect UPLOAD_VOLUME_OPTIMIZED_FOR_BACKENDS to be a list of backends
+    # similar to CINDER_ENABLED_BACKENDS with NAME:TYPE where NAME will
+    # be the backend specific configuration stanza in cinder.conf.
+    local be be_name
+    for be in ${CINDER_UPLOAD_OPTIMIZED_BACKENDS//,/ }; do
+        be_name=${be##*:}
+
+        iniset $CINDER_CONF $be_name image_upload_use_cinder_backend $CINDER_UPLOAD_OPTIMIZED
+        iniset $CINDER_CONF $be_name image_upload_use_internal_tenant $CINDER_UPLOAD_INTERNAL_TENANT
+    done
+}
+
+function init_cinder_service_user_conf {
+    configure_keystone_authtoken_middleware $CINDER_CONF cinder service_user
+    iniset $CINDER_CONF service_user send_service_user_token True
+    iniset $CINDER_CONF service_user auth_strategy keystone
+}
 
 # Restore xtrace
 $_XTRACE_CINDER

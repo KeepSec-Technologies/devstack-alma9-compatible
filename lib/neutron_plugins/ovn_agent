@@ -28,7 +28,7 @@ source ${TOP_DIR}/lib/neutron_plugins/ovs_source
 OVN_REPO=${OVN_REPO:-https://github.com/ovn-org/ovn.git}
 OVN_REPO_NAME=$(basename ${OVN_REPO} | cut -f1 -d'.')
 OVN_REPO_NAME=${OVN_REPO_NAME:-ovn}
-OVN_BRANCH=${OVN_BRANCH:-v20.06.1}
+OVN_BRANCH=${OVN_BRANCH:-branch-24.03}
 # The commit removing OVN bits from the OVS tree, it is the commit that is not
 # present in OVN tree and is used to distinguish if OVN is part of OVS or not.
 # https://github.com/openvswitch/ovs/commit/05bf1dbb98b0635a51f75e268ef8aed27601401d
@@ -161,8 +161,10 @@ fi
 
 # Defaults Overwrite
 # ------------------
-
-Q_ML2_PLUGIN_MECHANISM_DRIVERS=${Q_ML2_PLUGIN_MECHANISM_DRIVERS:-ovn,logger}
+# NOTE(ralonsoh): during the eventlet removal, the "logger" mech
+# driver has been removed from this list. Re-add it once the removal
+# is finished or the mech driver does not call monkey_patch().
+Q_ML2_PLUGIN_MECHANISM_DRIVERS=${Q_ML2_PLUGIN_MECHANISM_DRIVERS:-ovn}
 Q_ML2_PLUGIN_TYPE_DRIVERS=${Q_ML2_PLUGIN_TYPE_DRIVERS:-local,flat,vlan,geneve}
 Q_ML2_TENANT_NETWORK_TYPE=${Q_ML2_TENANT_NETWORK_TYPE:-"geneve"}
 Q_ML2_PLUGIN_GENEVE_TYPE_OPTIONS=${Q_ML2_PLUGIN_GENEVE_TYPE_OPTIONS:-"vni_ranges=1:65536"}
@@ -340,8 +342,24 @@ function compile_ovn {
         ./boot.sh
     fi
 
+    # NOTE(mnaser): OVN requires that you build using the OVS from the
+    #               submodule.
+    #
+    #               https://github.com/ovn-org/ovn/blob/3fb397b63663297acbcbf794e1233951222ae5af/Documentation/intro/install/general.rst#bootstrapping
+    #               https://github.com/ovn-org/ovn/issues/128
+    git submodule update --init
+    pushd ovs
+    if [ ! -f configure ] ; then
+        ./boot.sh
+    fi
     if [ ! -f config.status ] || [ configure -nt config.status ] ; then
-        ./configure --with-ovs-source=$DEST/$OVS_REPO_NAME $prefix $localstatedir
+        ./configure
+    fi
+    make -j$(($(nproc) + 1))
+    popd
+
+    if [ ! -f config.status ] || [ configure -nt config.status ] ; then
+        ./configure $prefix $localstatedir
     fi
     make -j$(($(nproc) + 1))
     sudo make install
@@ -688,28 +706,23 @@ function _start_ovs {
     fi
 }
 
-function _start_ovn_services {
-    _start_process "$OVSDB_SERVER_SERVICE"
-    _start_process "$OVS_VSWITCHD_SERVICE"
+function _wait_for_ovn_and_set_custom_config {
+    # Wait for the service to be ready
+    # Check for socket and db files for both OVN NB and SB
+    wait_for_sock_file $OVN_RUNDIR/ovnnb_db.sock
+    wait_for_sock_file $OVN_RUNDIR/ovnsb_db.sock
+    wait_for_db_file $OVN_DATADIR/ovnnb_db.db
+    wait_for_db_file $OVN_DATADIR/ovnsb_db.db
 
-    if is_service_enabled ovn-northd ; then
-        _start_process "$OVN_NORTHD_SERVICE"
+    if is_service_enabled tls-proxy; then
+        sudo ovn-nbctl --db=unix:$OVN_RUNDIR/ovnnb_db.sock set-ssl $INT_CA_DIR/private/$DEVSTACK_CERT_NAME.key $INT_CA_DIR/$DEVSTACK_CERT_NAME.crt $INT_CA_DIR/ca-chain.pem
+        sudo ovn-sbctl --db=unix:$OVN_RUNDIR/ovnsb_db.sock set-ssl $INT_CA_DIR/private/$DEVSTACK_CERT_NAME.key $INT_CA_DIR/$DEVSTACK_CERT_NAME.crt $INT_CA_DIR/ca-chain.pem
     fi
-    if is_service_enabled ovn-controller ; then
-        _start_process "$OVN_CONTROLLER_SERVICE"
-    fi
-    if is_service_enabled ovn-controller-vtep ; then
-        _start_process "$OVN_CONTROLLER_VTEP_SERVICE"
-    fi
-    if is_service_enabled ovs-vtep ; then
-        _start_process "devstack@ovs-vtep.service"
-    fi
-    if is_service_enabled q-ovn-metadata-agent neutron-ovn-metadata-agent ; then
-        _start_process "devstack@q-ovn-metadata-agent.service"
-    fi
-    if is_service_enabled q-ovn-agent neutron-ovn-agent ; then
-        _start_process "devstack@q-ovn-agent.service"
-    fi
+
+    sudo ovn-nbctl --db=unix:$OVN_RUNDIR/ovnnb_db.sock set-connection p${OVN_PROTO}:6641:$SERVICE_LISTEN_ADDRESS -- set connection . inactivity_probe=60000
+    sudo ovn-sbctl --db=unix:$OVN_RUNDIR/ovnsb_db.sock set-connection p${OVN_PROTO}:6642:$SERVICE_LISTEN_ADDRESS -- set connection . inactivity_probe=60000
+    sudo ovs-appctl -t $OVN_RUNDIR/ovnnb_db.ctl vlog/set console:off syslog:$OVN_DBS_LOG_LEVEL file:$OVN_DBS_LOG_LEVEL
+    sudo ovs-appctl -t $OVN_RUNDIR/ovnsb_db.ctl vlog/set console:off syslog:$OVN_DBS_LOG_LEVEL file:$OVN_DBS_LOG_LEVEL
 }
 
 # start_ovn() - Start running processes, including screen
@@ -733,21 +746,8 @@ function start_ovn {
             _start_process "$OVN_NORTHD_SERVICE"
         fi
 
-        # Wait for the service to be ready
-        # Check for socket and db files for both OVN NB and SB
-        wait_for_sock_file $OVN_RUNDIR/ovnnb_db.sock
-        wait_for_sock_file $OVN_RUNDIR/ovnsb_db.sock
-        wait_for_db_file $OVN_DATADIR/ovnnb_db.db
-        wait_for_db_file $OVN_DATADIR/ovnsb_db.db
+        _wait_for_ovn_and_set_custom_config
 
-        if is_service_enabled tls-proxy; then
-            sudo ovn-nbctl --db=unix:$OVN_RUNDIR/ovnnb_db.sock set-ssl $INT_CA_DIR/private/$DEVSTACK_CERT_NAME.key $INT_CA_DIR/$DEVSTACK_CERT_NAME.crt $INT_CA_DIR/ca-chain.pem
-            sudo ovn-sbctl --db=unix:$OVN_RUNDIR/ovnsb_db.sock set-ssl $INT_CA_DIR/private/$DEVSTACK_CERT_NAME.key $INT_CA_DIR/$DEVSTACK_CERT_NAME.crt $INT_CA_DIR/ca-chain.pem
-        fi
-        sudo ovn-nbctl --db=unix:$OVN_RUNDIR/ovnnb_db.sock set-connection p${OVN_PROTO}:6641:$SERVICE_LISTEN_ADDRESS -- set connection . inactivity_probe=60000
-        sudo ovn-sbctl --db=unix:$OVN_RUNDIR/ovnsb_db.sock set-connection p${OVN_PROTO}:6642:$SERVICE_LISTEN_ADDRESS -- set connection . inactivity_probe=60000
-        sudo ovs-appctl -t $OVN_RUNDIR/ovnnb_db.ctl vlog/set console:off syslog:$OVN_DBS_LOG_LEVEL file:$OVN_DBS_LOG_LEVEL
-        sudo ovs-appctl -t $OVN_RUNDIR/ovnsb_db.ctl vlog/set console:off syslog:$OVN_DBS_LOG_LEVEL file:$OVN_DBS_LOG_LEVEL
     fi
 
     if is_service_enabled ovn-controller ; then
@@ -781,8 +781,6 @@ function start_ovn {
         # Format logging
         setup_logging $OVN_AGENT_CONF
     fi
-
-    _start_ovn_services
 }
 
 function _stop_ovs_dp {

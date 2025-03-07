@@ -85,7 +85,7 @@ fi
 # Global toggle for enabling services under mod_wsgi. If this is set to
 # ``True`` all services that use HTTPD + mod_wsgi as the preferred method of
 # deployment, will be deployed under Apache. If this is set to ``False`` all
-# services will rely on the local toggle variable (e.g. ``KEYSTONE_USE_MOD_WSGI``)
+# services will rely on the local toggle variable.
 ENABLE_HTTPD_MOD_WSGI_SERVICES=True
 
 # Set the default Nova APIs to enable
@@ -126,10 +126,6 @@ if [[ -r $RC_DIR/.localrc.password ]]; then
     source $RC_DIR/.localrc.password
 fi
 
-# Control whether Python 3 should be used at all.
-# TODO(frickler): Drop this when all consumers are fixed
-export USE_PYTHON3=True
-
 # Adding the specific version of Python 3 to this variable will install
 # the app using that version of the interpreter instead of just 3.
 _DEFAULT_PYTHON3_VERSION="$(_get_python_version python3)"
@@ -165,10 +161,6 @@ if [[ "$LOG_COLOR" == "True" ]]; then
 else
     export PS4='+ $(short_source):   '
 fi
-
-# Configure Identity API version
-# TODO(frickler): Drop this when plugins no longer need it
-IDENTITY_API_VERSION=3
 
 # Global option for enforcing scope. If enabled, ENFORCE_SCOPE overrides
 # each services ${SERVICE}_ENFORCE_SCOPE variables
@@ -231,6 +223,9 @@ GIT_TIMEOUT=${GIT_TIMEOUT:-0}
 # proxy uwsgi in front of it, or "mod_wsgi", which runs in
 # apache. mod_wsgi is deprecated, don't use it.
 WSGI_MODE=${WSGI_MODE:-"uwsgi"}
+if [[ "$WSGI_MODE" != "uwsgi" ]]; then
+    die $LINENO "$WSGI_MODE is no longer a supported WSGI mode. Only uwsgi is valid."
+fi
 
 # Repositories
 # ------------
@@ -257,7 +252,7 @@ REQUIREMENTS_DIR=${REQUIREMENTS_DIR:-$DEST/requirements}
 # Setting the variable to 'ALL' will activate the download for all
 # libraries.
 
-DEVSTACK_SERIES="2024.2"
+DEVSTACK_SERIES="2025.1"
 
 ##############
 #
@@ -312,6 +307,9 @@ TEMPEST_REPO=${TEMPEST_REPO:-${GIT_BASE}/openstack/tempest.git}
 TEMPEST_BRANCH=${TEMPEST_BRANCH:-$BRANCHLESS_TARGET_BRANCH}
 TEMPEST_VENV_UPPER_CONSTRAINTS=${TEMPEST_VENV_UPPER_CONSTRAINTS:-master}
 
+OSTESTIMAGES_REPO=${OSTESTIMAGES_REPO:-${GIT_BASE}/openstack/os-test-images.git}
+OSTESTIMAGES_BRANCH=${OSTESTIMAGES_BRANCH:-$BRANCHLESS_TARGET_BRANCH}
+OSTESTIMAGES_DIR=${DEST}/os-test-images
 
 ##############
 #
@@ -661,7 +659,7 @@ esac
 
 #IMAGE_URLS="https://download.cirros-cloud.net/${CIRROS_VERSION}/cirros-${CIRROS_VERSION}-${CIRROS_ARCH}-disk.img" # cirros full disk image
 
-CIRROS_VERSION=${CIRROS_VERSION:-"0.6.2"}
+CIRROS_VERSION=${CIRROS_VERSION:-"0.6.3"}
 CIRROS_ARCH=${CIRROS_ARCH:-$(uname -m)}
 
 # Set default image based on ``VIRT_DRIVER`` and ``LIBVIRT_TYPE``, either of
@@ -678,11 +676,11 @@ if [[ "$DOWNLOAD_DEFAULT_IMAGES" == "True" ]]; then
                 lxc) # the cirros root disk in the uec tarball is empty, so it will not work for lxc
                     DEFAULT_IMAGE_NAME=${DEFAULT_IMAGE_NAME:-cirros-${CIRROS_VERSION}-${CIRROS_ARCH}-rootfs}
                     DEFAULT_IMAGE_FILE_NAME=${DEFAULT_IMAGE_FILE_NAME:-cirros-${CIRROS_VERSION}-${CIRROS_ARCH}-rootfs.img.gz}
-                    IMAGE_URLS+="https://download.cirros-cloud.net/${CIRROS_VERSION}/${DEFAULT_IMAGE_FILE_NAME}";;
+                    IMAGE_URLS+="https://github.com/cirros-dev/cirros/releases/download/${CIRROS_VERSION}/${DEFAULT_IMAGE_FILE_NAME}";;
                 *) # otherwise, use the qcow image
                     DEFAULT_IMAGE_NAME=${DEFAULT_IMAGE_NAME:-cirros-${CIRROS_VERSION}-${CIRROS_ARCH}-disk}
                     DEFAULT_IMAGE_FILE_NAME=${DEFAULT_IMAGE_FILE_NAME:-cirros-${CIRROS_VERSION}-${CIRROS_ARCH}-disk.img}
-                    IMAGE_URLS+="https://download.cirros-cloud.net/${CIRROS_VERSION}/${DEFAULT_IMAGE_FILE_NAME}";;
+                    IMAGE_URLS+="https://github.com/cirros-dev/cirros/releases/download/${CIRROS_VERSION}/${DEFAULT_IMAGE_FILE_NAME}";;
                 esac
             ;;
         vsphere)
@@ -693,7 +691,7 @@ if [[ "$DOWNLOAD_DEFAULT_IMAGES" == "True" ]]; then
             # Use the same as the default for libvirt
             DEFAULT_IMAGE_NAME=${DEFAULT_IMAGE_NAME:-cirros-${CIRROS_VERSION}-${CIRROS_ARCH}-disk}
             DEFAULT_IMAGE_FILE_NAME=${DEFAULT_IMAGE_FILE_NAME:-cirros-${CIRROS_VERSION}-${CIRROS_ARCH}-disk.img}
-            IMAGE_URLS+="http://download.cirros-cloud.net/${CIRROS_VERSION}/${DEFAULT_IMAGE_FILE_NAME}";;
+            IMAGE_URLS+="https://github.com/cirros-dev/cirros/releases/download/${CIRROS_VERSION}/${DEFAULT_IMAGE_FILE_NAME}";;
     esac
     DOWNLOAD_DEFAULT_IMAGES=False
 fi
